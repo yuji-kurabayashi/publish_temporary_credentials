@@ -1,0 +1,222 @@
+AWSTemplateFormatVersion: 2010-09-09
+Description: >-
+  Create Assume Role.
+  Using this template, you can prepare a policy specifying the actions you want to allow, and then combine it with an existing policy to create a role for issuing credentials.
+
+Metadata:
+  AWS::CloudFormation::Interface:
+    ParameterGroups:
+      - Label:
+          default: Assume Role Resource Settings
+        Parameters:
+          - AssumeRoleName
+          - IamUserArns
+          - AssumePolicyArns
+          - AllowActions1
+          - AllowResources1
+          - AllowActions2
+          - AllowResources2
+          - AllowActions3
+          - AllowResources3
+    ParameterLabels:
+      AssumeRoleName:
+        default: AssumeRoleName
+      IamUserArns:
+        default: IamUserArns
+      AssumePolicyArns:
+        default: AssumePolicyArns
+      AllowActions1:
+        default: AllowActions1
+      AllowResources1:
+        default: AllowResources1
+      AllowActions2:
+        default: AllowActions2
+      AllowResources2:
+        default: AllowResources2
+      AllowActions3:
+        default: AllowActions3
+      AllowResources3:
+        default: AllowResources3
+
+Parameters:
+
+  AssumeRoleName:
+    Description: <Optional> assume role name. If not specified this, apply this stack name.
+    Type: String
+
+  IamUserArns:
+    Type: CommaDelimitedList
+    Description: |
+      <Optional> A list of IAM user ARNs to be applied to the creation of assume role. You can specify multiple targets separated with comma(,). If not specified this, apply all users of current AWS account id.
+      For example, 'arn:aws:iam::123456789012:user/<username>'.
+  AssumePolicyArns:
+    Type: CommaDelimitedList
+    Description: |
+      <Conditional> At least one of 'AssumePolicyArns' or 'AllowActions' is required. If both are specified, both are applied under the or condition.
+      A list of already exists Managed Policy ARNs to be applied to the creation of assume role. You can specify multiple targets separated with comma(,).
+      For example, 'arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess' etc.
+  AllowActions1:
+    Type: CommaDelimitedList
+    Description: |
+      <Conditional> At least one of 'AssumePolicyArns' or 'AllowActions' is required. If both are specified, both are applied under the or condition.
+      A list of create new Managed Policy allow actions to be applied to the creation of assume role. You can specify multiple targets separated with comma(,).
+      For example, 's3:ListAllMyBuckets' etc.
+  AllowResources1:
+    Type: CommaDelimitedList
+    Description: |
+      <Optional> A list of create new Managed Policy allow resource ARNs to be applied to the creation of assume role. You can specify multiple targets separated with comma(,). If not specified this, apply all resources.
+      For example, 'arn:aws:s3:::<bucketname>/*' etc.
+  AllowActions2:
+    Type: CommaDelimitedList
+    Description: |
+      <Conditional> At least one of 'AssumePolicyArns' or 'AllowActions' is required. If both are specified, both are applied under the or condition.
+      A list of create new Managed Policy allow actions to be applied to the creation of assume role. You can specify multiple targets separated with comma(,).
+      For example, 's3:ListAllMyBuckets' etc.
+  AllowResources2:
+    Type: CommaDelimitedList
+    Description: |
+      <Optional> A list of create new Managed Policy allow resource ARNs to be applied to the creation of assume role. You can specify multiple targets separated with comma(,). If not specified this, apply all resources.
+      For example, 'arn:aws:s3:::<bucketname>/*' etc.
+  AllowActions3:
+    Type: CommaDelimitedList
+    Description: |
+      <Conditional> At least one of 'AssumePolicyArns' or 'AllowActions' is required. If both are specified, both are applied under the or condition.
+      A list of create new Managed Policy allow actions to be applied to the creation of assume role. You can specify multiple targets separated with comma(,).
+      For example, 's3:ListAllMyBuckets' etc.
+  AllowResources3:
+    Type: CommaDelimitedList
+    Description: |
+      <Optional> A list of create new Managed Policy allow resource ARNs to be applied to the creation of assume role. You can specify multiple targets separated with comma(,). If not specified this, apply all resources.
+      For example, 'arn:aws:s3:::<bucketname>/*' etc.
+
+Conditions:
+
+  SpecifiedAssumeRoleName: !Not [ !Equals [ !Ref AssumeRoleName, "" ] ]
+  SpecifiedIamUserArns: !Not [ !Equals [ !Join [ ',', !Ref IamUserArns ], "" ] ]
+  SpecifiedAssumePolicyArns: !Not [ !Equals [ !Join [ ',', !Ref AssumePolicyArns ], "" ] ]
+  SpecifiedAllowActions1: !Not [ !Equals [ !Join [ ',', !Ref AllowActions1 ], "" ] ]
+  SpecifiedAllowActions2: !Not [ !Equals [ !Join [ ',', !Ref AllowActions2 ], "" ] ]
+  SpecifiedAllowActions3: !Not [ !Equals [ !Join [ ',', !Ref AllowActions3 ], "" ] ]
+  SpecifiedAllowResources1: !Not [ !Equals [ !Join [ ',', !Ref AllowResources1 ], "" ] ]
+  SpecifiedAllowResources2: !Not [ !Equals [ !Join [ ',', !Ref AllowResources2 ], "" ] ]
+  SpecifiedAllowResources3: !Not [ !Equals [ !Join [ ',', !Ref AllowResources3 ], "" ] ]
+  SpecifiedAllowActions:
+    Fn::Or:
+      - !Condition SpecifiedAllowActions1
+      - !Condition SpecifiedAllowActions2
+      - !Condition SpecifiedAllowActions3
+
+Resources:
+
+  AssumeRole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName:
+        Fn::If:
+          - SpecifiedAssumeRoleName
+          - !Ref AssumeRoleName
+          - !Sub ${AWS::StackName}
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              AWS:
+                Fn::If:
+                  - SpecifiedIamUserArns
+                  - !Ref IamUserArns
+                  - !Sub arn:aws:iam::${AWS::AccountId}:root
+            Action: sts:AssumeRole
+      ManagedPolicyArns:
+        Fn::If:
+          - SpecifiedAssumePolicyArns
+          - Fn::Split:
+              - ','
+              - Fn::Join:
+                  - ','
+                  - - Fn::Join:
+                        - ','
+                        - !Ref AssumePolicyArns
+                    - Fn::If:
+                        - SpecifiedAllowActions
+                        - !Ref AllowActionsPolicy
+                        - !Ref AWS::NoValue
+          - - !Ref AllowActionsPolicy
+      Tags:
+        - Key: Name
+          Value:
+            Fn::If:
+              - SpecifiedAssumeRoleName
+              - !Ref AssumeRoleName
+              - !Sub ${AWS::StackName}
+
+  AllowActionsPolicy:
+    Type: AWS::IAM::ManagedPolicy
+    Condition: SpecifiedAllowActions
+    Properties:
+      ManagedPolicyName:
+        Fn::If:
+          - SpecifiedAssumeRoleName
+          - !Sub ${AssumeRoleName}-allow-actions-policy
+          - !Sub ${AWS::StackName}-allow-actions-policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Fn::If:
+              - SpecifiedAllowActions1
+              -
+                Sid: AllowActions1
+                Effect: Allow
+                Action: !Ref AllowActions1
+                Resource:
+                  Fn::If:
+                    - SpecifiedAllowResources1
+                    - !Ref AllowResources1
+                    - "*"
+              - !Ref AWS::NoValue
+          - Fn::If:
+              - SpecifiedAllowActions2
+              -
+                Sid: AllowActions2
+                Effect: Allow
+                Action: !Ref AllowActions2
+                Resource:
+                  Fn::If:
+                    - SpecifiedAllowResources2
+                    - !Ref AllowResources2
+                    - "*"
+              - !Ref AWS::NoValue
+          - Fn::If:
+              - SpecifiedAllowActions3
+              -
+                Sid: AllowActions3
+                Effect: Allow
+                Action: !Ref AllowActions3
+                Resource:
+                  Fn::If:
+                    - SpecifiedAllowResources3
+                    - !Ref AllowResources3
+                    - "*"
+              - !Ref AWS::NoValue
+
+Outputs:
+
+  AssumeRoleArn:
+    Value: !GetAtt AssumeRole.Arn
+    Export:
+      Name:
+        Fn::If:
+          - SpecifiedAssumeRoleName
+          - !Sub ${AssumeRoleName}-AssumeRoleArn
+          - !Sub ${AWS::StackName}-AssumeRoleArn
+
+  AssumeRoleCommand:
+    Value: !Sub
+      - aws sts assume-role --role-arn ${AssumeRoleArn} --role-session-name `date +%Y%m%d%H%M%S`-session | jq -r "[ \"export AWS_ACCESS_KEY_ID=\" + .Credentials.AccessKeyId, \"export AWS_SECRET_ACCESS_KEY=\" + .Credentials.SecretAccessKey, \"export AWS_SESSION_TOKEN=\" + .Credentials.SessionToken ] | .[]" && echo export AWS_DEFAULT_REGION=${AWS::Region}
+      - AssumeRoleArn: !GetAtt AssumeRole.Arn
+    Export:
+      Name:
+        Fn::If:
+          - SpecifiedAssumeRoleName
+          - !Sub ${AssumeRoleName}-AssumeRoleCommand
+          - !Sub ${AWS::StackName}-AssumeRoleCommand
